@@ -1,0 +1,332 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "sqlite"
+    // NOTE: When using postgresql, mysql or sqlserver, uncomment the @db.Text annotations in model Account below
+    // Further reading:
+    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
+    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
+    url      = env("DATABASE_URL")
+}
+
+// Players and Factions
+model Player {
+  id                Int                @id @default(autoincrement())
+  faction           Faction            @relation(fields: [factionId], references: [id])
+  factionId         Int
+  usedDisks         Int
+  usedColonyShips   Int
+  passed            Boolean
+  blueprints        PlayerBlueprint[]
+  reputationTiles   PlayerReputationTile[]
+  ambassadors       PlayerAmbassador[]
+  resources         PlayerResource[]
+  technologies      PlayerTechnology[]
+  ships             Ship[]
+  sectors           Sector[]
+}
+
+model Faction {
+  id                  Int                  @id @default(autoincrement())
+  factionName         String
+  maxInfluenceDisks   Int
+  influenceCosts      Json
+  reputationCapacity  Int
+  ambassadorCapacity  Int
+  colonyShips         Int
+  defaultBlueprints   Json
+  actionCount         Json
+  startingResources   Json
+  tradeRation         Int
+  players             Player[]
+}
+
+// Player-specific Tables
+model PlayerBlueprint {
+  player     Player   @relation(fields: [playerId], references: [id])
+  playerId   Int
+  blueprint  Blueprint @relation(fields: [blueprintId], references: [id])
+  blueprintId Int
+  @@id([playerId, blueprintId])
+}
+
+model PlayerReputationTile {
+  player          Player         @relation(fields: [playerId], references: [id])
+  playerId        Int
+  reputationTile  ReputationTile @relation(fields: [reputationTileId], references: [id])
+  reputationTileId Int
+  @@id([playerId, reputationTileId])
+}
+
+model PlayerAmbassador {
+  player     Player     @relation(fields: [playerId], references: [id])
+  playerId   Int
+  ambassador Ambassador @relation(fields: [ambassadorId], references: [id])
+  ambassadorId Int
+  @@id([playerId, ambassadorId])
+}
+
+// Resources and Sectors
+model PlayerResource {
+  player          Player @relation(fields: [playerId], references: [id])
+  playerId        Int
+  resourceType    String
+  progressionTrack Json
+  populationCubes Int
+  @@id([playerId, resourceType])
+}
+
+model SectorResource {
+  sector         Sector @relation(fields: [sectorId], references: [id])
+  sectorId       Int
+  player         Player @relation(fields: [playerId], references: [id])
+  playerId       Int
+  controlled     Boolean
+  resourceType   String
+  planets        Json
+  ships          Json
+  constructs     Json
+  populationCubes Json
+  discoveryTile  DiscoveryTile? @relation(fields: [discoveryTileId], references: [id])
+  discoveryTileId Int?
+  @@id([sectorId, playerId, resourceType])
+}
+
+// Technologies and Parts
+model Technology {
+  id          Int
+  name        String
+  type        String
+  cost        Int
+  effect      Json
+  part        Part @relation(fields: [partId], references: [id])
+  partId      Int
+  TechnologyPartMapping TechnologyPartMapping[]
+  PlayerTechnology      PlayerTechnology[]
+  TechnologyTray        TechnologyTray[]
+  @@id([id])
+}
+
+model Part {
+  id          Int
+  name        String
+  type        PartType
+  effect      Json
+  dice        Dice? @relation(fields: [diceId], references: [id])
+  diceId      Int?
+  diceCount   Int
+  driveSpeed  Int
+  initiativeBonus Int
+  hullValue   Int
+  energyProduction Int
+  TechnologyPartMapping TechnologyPartMapping[]
+  BlueprintPart        BlueprintPart[]
+  @@id([id])
+}
+
+model TechnologyPartMapping {
+  technology   Technology @relation(fields: [technologyId], references: [id])
+  technologyId Int
+  part         Part       @relation(fields: [partId], references: [id])
+  partId       Int
+  @@id([technologyId, partId])
+}
+
+// Player Technologies and Technology Tray
+model PlayerTechnology {
+  player       Player     @relation(fields: [playerId], references: [id])
+  playerId     Int
+  technology   Technology @relation(fields: [technologyId], references: [id])
+  technologyId Int
+  victoryPoints Int
+  @@id([playerId, technologyId])
+}
+
+model TechnologyTray {
+  id           Int
+  technology   Technology @relation(fields: [technologyId], references: [id])
+  technologyId Int
+  roundNumber  Int
+  @@id([id])
+}
+
+// Sectors and Ships
+model Sector {
+  id               Int
+  type             String
+  discoveryTile    DiscoveryTile? @relation(fields: [discoveryTileId], references: [id])
+  discoveryTileId  Int?
+  player           Player?        @relation(fields: [playerId], references: [id])
+  playerId         Int?
+  warpPortals      Json
+  SectorResource   SectorResource[]
+  Ship             Ship[]
+  @@id([id])
+}
+
+model Ship {
+  id           Int
+  type         ConstructType
+  materialCost Int
+  needTechnology Boolean
+  isPinned     Boolean
+  sector       Sector  @relation(fields: [sectorId], references: [id])
+  sectorId     Int
+  player       Player  @relation(fields: [playerId], references: [id])
+  playerId     Int
+  blueprint    Blueprint? @relation(fields: [blueprintId], references: [id])
+  blueprintId  Int?
+  @@id([id])
+}
+
+// Blueprints
+model Blueprint {
+  id           Int
+  shipType     ShipType
+  PlayerBlueprint BlueprintPlayer[]
+  Ship         Ship[]
+  BlueprintPart BlueprintPart[]
+  @@id([id])
+}
+
+model BlueprintPart {
+  blueprint    Blueprint @relation(fields: [blueprintId], references: [id])
+  blueprintId  Int
+  part         Part      @relation(fields: [partId], references: [id])
+  partId       Int
+  @@id([blueprintId, partId])
+}
+
+// Dice
+model Dice {
+  id        Int
+  type      String
+  sides     Json
+  Part      Part[]
+  @@id([id])
+}
+
+// Tiles
+model DiscoveryTile {
+  id             Int
+  type           String
+  effect         Json
+  victoryPoints  Int
+  pickedUp       Boolean
+  player         Player?   @relation(fields: [playerId], references: [id])
+  playerId       Int?
+  technology     Technology? @relation(fields: [technologyId], references: [id])
+  technologyId   Int?
+  sector         Sector?   @relation(fields: [sectorId], references: [id])
+  sectorId       Int?
+  @@id([id])
+}
+
+model ReputationTile {
+  id             Int
+  victoryPoints  Int
+  PlayerReputationTile PlayerReputationTile[]
+  @@id([id])
+}
+
+model Ambassador {
+  id             Int
+  effect         Json
+  ally           Player?  @relation(fields: [allyId], references: [id])
+  allyId         Int?
+  PlayerAmbassador PlayerAmbassador[]
+  @@id([id])
+}
+
+// Enums
+enum Phase {
+  action
+  combat
+  upkeep
+  cleanup
+}
+
+enum PartType {
+  DRIVE
+  CANNON
+  HULL
+  ENERGY
+  MISSILE
+}
+
+enum ConstructType {
+  INTERCEPTOR
+  CRUISER
+  DREADNAUGHT
+  STATIONS
+  STARBASE
+  ORBITAL // can hold a population cube
+  MONOLITH // a building worth 5 points at the end of the game. Need a technology to build
+}
+
+enum ActionType {
+  EXPLORE
+  BUILD
+  UPGRADE
+  RESEARCH
+  INFLUENCE
+  PASS
+}
+
+// Game Rounds
+model GameRound {
+  id           Int
+  roundNumber  Int
+  phase        Phase
+  @@id([id])
+}
+
+// Necessary for Next auth
+model Account {
+    id                String  @id @default(cuid())
+    userId            String
+    type              String
+    provider          String
+    providerAccountId String
+    refresh_token     String? // @db.Text
+    access_token      String? // @db.Text
+    expires_at        Int?
+    token_type        String?
+    scope             String?
+    id_token          String? // @db.Text
+    session_state     String?
+    user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([provider, providerAccountId])
+}
+
+model Session {
+    id           String   @id @default(cuid())
+    sessionToken String   @unique
+    userId       String
+    expires      DateTime
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+    id            String    @id @default(cuid())
+    name          String?
+    email         String?   @unique
+    emailVerified DateTime?
+    image         String?
+    accounts      Account[]
+    sessions      Session[]
+}
+
+model VerificationToken {
+    identifier String
+    token      String   @unique
+    expires    DateTime
+
+    @@unique([identifier, token])
+}
